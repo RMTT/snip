@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 
 import argparse
 import asyncio
@@ -92,6 +93,7 @@ async def config_loader(args: argparse.Namespace) -> SnipConfig:
 
 async def _async_main(args: argparse.Namespace) -> None:
     try:
+        args.flake = os.path.realpath(args.flake)
         config = await config_loader(args)
     except RuntimeError as e:
         msg = (
