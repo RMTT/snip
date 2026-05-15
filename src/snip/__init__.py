@@ -1,0 +1,1 @@
+"""snip - NixOS deployment tool."""
