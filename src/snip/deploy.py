@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 from snip import nix, ssh
 from snip.models import NodeConfig, SnipConfig
@@ -115,6 +116,16 @@ async def activate_node(
         raise
 
 
+def _save_failed_logs(progress_map: dict[str, NodeProgress]) -> None:
+    for name, progress in progress_map.items():
+        if progress.phase != DeployPhase.FAILED:
+            continue
+        if not progress.logs:
+            continue
+        log_path = Path(f"/tmp/snip-{name}.log")
+        log_path.write_text("\n".join(progress.logs) + "\n")
+
+
 async def run_phase(
     config: SnipConfig,
     node_names: list[str],
@@ -156,6 +167,8 @@ async def run_phase(
                 await t
             except RuntimeError:
                 pass
+
+        _save_failed_logs(progress_map)
 
         nodes_list = list(progress_map.values())
         frame = render_deploy(nodes_list, action_label)

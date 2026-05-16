@@ -213,7 +213,7 @@ class Components:
 
         lines.append(
             f" {AnsiUI.RED}└─{AnsiUI.RESET}"
-            f" {AnsiUI.SLATE}📝 View full log: 'nix log' command{AnsiUI.RESET}"
+            f" {AnsiUI.SLATE}📝Full log saved to /tmp/snip-{node.name}.log{AnsiUI.RESET}"
         )
 
         return lines

@@ -128,6 +128,7 @@ async def _run(args: argparse.Namespace) -> None:
             f"Failed to parse snip config:{AnsiUI.RESET}\n\n{e}"
         )
         print(msg)
+        return
 
     if args.command == "list":
         print("\n".join(render_node_table(config.nodes, args.flake)))
@@ -137,7 +138,7 @@ async def _run(args: argparse.Namespace) -> None:
 
     if not node_names:
         print(f"{AnsiUI.AMBER}No matching nodes found{AnsiUI.RESET}")
-        sys.exit(1)
+        return
 
     if args.dry_run:
         print(
