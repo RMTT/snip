@@ -23,10 +23,10 @@ async def build_node(
     try:
         progress.phase = DeployPhase.BUILDING
 
-        if node.remote_build:
-            progress.current_status = f"evaluating derivation for {node.name}"
-            drv_path = await nix.eval_drvpath(node.config)
+        progress.current_status = f"evaluating derivation for {node.name}"
+        drv_path = await nix.eval_drvpath(node.config)
 
+        if node.remote_build:
             ssh_target = f"{node.user}@{node.host}"
             progress.current_status = f"copying derivation to {node.host}"
             await nix.copy_closure(
@@ -36,7 +36,7 @@ async def build_node(
             )
 
             progress.current_status = f"building {node.name} on {node.host}"
-            store_path = await ssh.realise(
+            progress.store_path = await ssh.realise(
                 node.user,
                 node.host,
                 drv_path,
@@ -44,14 +44,12 @@ async def build_node(
                 ssh_options=node.ssh_options,
                 on_line=lambda line: progress.logs.append(line),
             )
-            progress.store_path = store_path
         else:
-            progress.current_status = f"building {node.name} from {node.config}"
-            store_path = await nix.build_toplevel(
-                node.config,
+            progress.current_status = f"building {node.name}"
+            progress.store_path = await nix.realise(
+                drv_path,
                 on_line=lambda line: progress.logs.append(line),
             )
-            progress.store_path = store_path
 
         progress.phase = DeployPhase.DONE
     except RuntimeError as e:

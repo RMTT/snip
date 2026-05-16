@@ -61,15 +61,15 @@ async def eval_snip_config(
     return SnipConfig.from_json(flake_ref, data)
 
 
-async def build_toplevel(
-    config_path: str,
+async def realise(
+    drv_path: str,
     *,
     on_line: Callable[[str], None] | None = None,
 ) -> str:
-    attr = f"{config_path}.config.system.build.toplevel"
-    cmd = ["nix", "build", attr, "--no-link", "--print-out-paths"]
-    cmd.append("--accept-flake-config")
-    stdout, _, _ = await _run_streaming(cmd, on_stderr=on_line)
+    cmd = ["nix-store", "--realise", drv_path]
+    stdout, stderr, rc = await _run_streaming(cmd, on_stderr=on_line, check=False)
+    if rc != 0:
+        raise RuntimeError(f"nix-store --realise failed: {stderr.strip()}")
     return stdout.strip()
 
 
