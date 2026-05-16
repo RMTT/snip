@@ -11,9 +11,17 @@ _IGNORE_HOSTS_OPTIONS = [
 ]
 
 
-def make_ssh_args(user: str, host: str, port: int) -> list[str]:
+def make_ssh_args(
+    user: str,
+    host: str,
+    port: int,
+    ssh_options: list[str] | None = None,
+) -> list[str]:
     args = ["ssh"]
     args.extend(_IGNORE_HOSTS_OPTIONS)
+    if ssh_options:
+        for opt in ssh_options:
+            args.extend(["-o", opt])
     if port != 22:
         args.extend(["-p", str(port)])
     args.append(f"{user}@{host}")
@@ -31,10 +39,11 @@ async def realise(
     host: str,
     drv_path: str,
     port: int = 22,
+    ssh_options: list[str] | None = None,
     *,
     on_line: Callable[[str], None] | None = None,
 ) -> str:
-    ssh_base = make_ssh_args(user, host, port)
+    ssh_base = make_ssh_args(user, host, port, ssh_options)
     realise_cmd = _maybe_sudo(user, ["nix-store", "--realise", drv_path])
     stdout, stderr, rc = await _run_streaming(
         ssh_base + realise_cmd,
@@ -51,10 +60,11 @@ async def activate(
     host: str,
     store_path: str,
     port: int = 22,
+    ssh_options: list[str] | None = None,
     *,
     on_line: Callable[[str], None] | None = None,
 ) -> list[str]:
-    ssh_base = make_ssh_args(user, host, port)
+    ssh_base = make_ssh_args(user, host, port, ssh_options)
 
     nix_env_cmd = _maybe_sudo(
         user,

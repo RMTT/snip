@@ -40,6 +40,7 @@ async def build_node(
                 node.host,
                 drv_path,
                 port=node.port,
+                ssh_options=node.ssh_options,
                 on_line=lambda line: progress.logs.append(line),
             )
             progress.store_path = store_path
@@ -104,6 +105,7 @@ async def activate_node(
             node.host,
             progress.store_path,
             port=node.port,
+            ssh_options=node.ssh_options,
             on_line=lambda line: progress.logs.append(line),
         )
         progress.phase = DeployPhase.DONE
