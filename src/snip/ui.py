@@ -151,7 +151,7 @@ class Components:
             lines.append(f" {AnsiUI.VOID}{'━' * 50}{AnsiUI.RESET}")
             return lines
 
-        msg = f"{len(failed_nodes)} out of {total_count} f{node_str} reported errors"
+        msg = f"{len(failed_nodes)} out of {total_count} {node_str} reported errors"
         lines.append(
             f"{AnsiUI.RED}✖ {action.upper()} FAILED{AnsiUI.RESET}"
             f" {AnsiUI.SLATE}» {msg}{AnsiUI.RESET}"

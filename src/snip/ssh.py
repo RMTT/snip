@@ -26,6 +26,26 @@ def _maybe_sudo(user: str, cmd: list[str]) -> list[str]:
     return ["sudo", "--"] + cmd
 
 
+async def realise(
+    user: str,
+    host: str,
+    drv_path: str,
+    port: int = 22,
+    *,
+    on_line: Callable[[str], None] | None = None,
+) -> str:
+    ssh_base = make_ssh_args(user, host, port)
+    realise_cmd = _maybe_sudo(user, ["nix-store", "--realise", drv_path])
+    stdout, stderr, rc = await _run_streaming(
+        ssh_base + realise_cmd,
+        on_stdout=on_line,
+        check=False,
+    )
+    if rc != 0:
+        raise RuntimeError(f"nix-store --realise failed: {stderr.strip()}")
+    return stdout.strip()
+
+
 async def activate(
     user: str,
     host: str,

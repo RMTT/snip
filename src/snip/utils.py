@@ -27,6 +27,7 @@ async def run(cmd: list[str], *, check: bool = True) -> tuple[str, str, int]:
         proc.terminate()
         await proc.wait()
         raise
+
     if check and proc.returncode != 0:
         raise RuntimeError(f"command: {' '.join(cmd)}\n{stderr.decode().strip()}")
     return stdout.decode(), stderr.decode(), proc.returncode or 0
@@ -70,6 +71,7 @@ async def run_streaming(
         proc.terminate()
         await proc.wait()
         raise
+
     if check and proc.returncode != 0:
         raise RuntimeError(f"command: {' '.join(cmd)}\n{stderr.strip()}")
     return stdout, stderr, proc.returncode or 0

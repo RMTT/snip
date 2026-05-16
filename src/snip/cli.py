@@ -65,10 +65,13 @@ def _filter_nodes(config_nodes: dict, args: argparse.Namespace) -> list[str]:
 
 async def config_loader(args: argparse.Namespace) -> SnipConfig:
     async def _load() -> SnipConfig:
-        config = await eval_snip_config(flake_ref=args.flake)
+        config = await eval_snip_config(
+            flake_ref=args.flake, remote_override=args.remote_build
+        )
         extra_node_info = await eval_node_info(flake=args.flake)
         for node in extra_node_info:
             config.nodes[node].update_nodeinfo(extra_node_info[node])
+
         return config
 
     tasks = asyncio.create_task(_load())
@@ -94,17 +97,17 @@ async def config_loader(args: argparse.Namespace) -> SnipConfig:
 
 async def _async_main(args: argparse.Namespace) -> None:
     loop = asyncio.get_running_loop()
-    main_task: asyncio.Task[None] | None = None
+    main_task = asyncio.create_task(_run(args))
 
     def _on_sigint() -> None:
-        if main_task is not None:
-            main_task.cancel()
+        main_task.cancel()
 
     loop.add_signal_handler(signal.SIGINT, _on_sigint)
     try:
-        main_task = asyncio.create_task(_run(args))
         await main_task
     except asyncio.CancelledError:
+        while not main_task.done():
+            await asyncio.sleep(0.5)
         print(f"\n{AnsiUI.AMBER}Cancelled.{AnsiUI.RESET}")
         sys.exit(130)
     finally:
@@ -121,7 +124,6 @@ async def _run(args: argparse.Namespace) -> None:
             f"Failed to parse snip config:{AnsiUI.RESET}\n\n{e}"
         )
         print(msg)
-        sys.exit(1)
 
     if args.command == "list":
         print(render_node_table(config.nodes))
@@ -143,21 +145,18 @@ async def _run(args: argparse.Namespace) -> None:
         await run_deploy(
             config,
             node_names,
-            remote_override=args.remote_build,
             parallel=args.parallel,
         )
     elif args.command == "build":
         await run_build(
             config,
             node_names,
-            remote_override=args.remote_build,
             parallel=args.parallel,
         )
     elif args.command == "push":
         await run_push(
             config,
             node_names,
-            remote_override=args.remote_build,
             parallel=args.parallel,
         )
     elif args.command == "activate":

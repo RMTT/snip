@@ -47,26 +47,35 @@ async def eval_node_info(flake: str) -> dict[str, dict[str, Any]]:
 
 
 async def eval_snip_config(
-    flake_ref: str = ".",
+    flake_ref: str = ".", remote_override: bool = False
 ) -> SnipConfig:
     cmd = ["nix", "eval", "--json", f"{flake_ref}#snip", "--apply", _APPLY_STRIP_CONFIG]
     stdout, _, _ = await _run(cmd)
-    data = json.loads(stdout)
+    data: dict = json.loads(stdout)
+
+    # apply cmd overrides
+    for node in data.get("nodes", {}).values():
+        if remote_override:
+            node["remoteBuild"] = remote_override
+
     return SnipConfig.from_json(flake_ref, data)
 
 
 async def build_toplevel(
     config_path: str,
     *,
-    remote: bool = False,
-    ssh_target: str | None = None,
     on_line: Callable[[str], None] | None = None,
 ) -> str:
     attr = f"{config_path}.config.system.build.toplevel"
     cmd = ["nix", "build", attr, "--no-link", "--print-out-paths"]
-    if remote and ssh_target:
-        cmd.extend(["--store", f"ssh-ng://{ssh_target}"])
+    cmd.append("--accept-flake-config")
     stdout, _, _ = await _run_streaming(cmd, on_stderr=on_line)
+    return stdout.strip()
+
+
+async def eval_drvpath(config_path: str) -> str:
+    attr = f"{config_path}.config.system.build.toplevel.drvPath"
+    stdout, _, _ = await _run(["nix", "eval", "--raw", attr])
     return stdout.strip()
 
 
@@ -77,7 +86,14 @@ async def copy_closure(
     on_line: Callable[[str], None] | None = None,
 ) -> None:
     await _run_streaming(
-        ["nix", "copy", "--to", f"ssh-ng://{ssh_target}", store_path],
+        [
+            "nix",
+            "copy",
+            "--to",
+            f"ssh-ng://{ssh_target}",
+            store_path,
+            "--accept-flake-config",
+        ],
         on_stderr=on_line,
     )
 

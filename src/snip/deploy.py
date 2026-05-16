@@ -18,23 +18,41 @@ from snip.ui import (
 async def build_node(
     node: NodeConfig,
     progress: NodeProgress,
-    *,
-    remote_override: bool | None = None,
 ) -> None:
-    remote = remote_override if remote_override is not None else node.remote_build
-
     try:
         progress.phase = DeployPhase.BUILDING
-        progress.current_status = f"building {node.name} from {node.config}"
-        store_path = await nix.build_toplevel(
-            node.config,
-            remote=remote,
-            ssh_target=f"{node.user}@{node.host}" if remote else None,
-            on_line=lambda line: progress.logs.append(line),
-        )
-        progress.store_path = store_path
+
+        if node.remote_build:
+            progress.current_status = f"evaluating derivation for {node.name}"
+            drv_path = await nix.eval_drvpath(node.config)
+
+            ssh_target = f"{node.user}@{node.host}"
+            progress.current_status = f"copying derivation to {node.host}"
+            await nix.copy_closure(
+                drv_path,
+                ssh_target,
+                on_line=lambda line: progress.logs.append(line),
+            )
+
+            progress.current_status = f"building {node.name} on {node.host}"
+            store_path = await ssh.realise(
+                node.user,
+                node.host,
+                drv_path,
+                port=node.port,
+                on_line=lambda line: progress.logs.append(line),
+            )
+            progress.store_path = store_path
+        else:
+            progress.current_status = f"building {node.name} from {node.config}"
+            store_path = await nix.build_toplevel(
+                node.config,
+                on_line=lambda line: progress.logs.append(line),
+            )
+            progress.store_path = store_path
+
         progress.phase = DeployPhase.DONE
-    except Exception as e:
+    except RuntimeError as e:
         progress.phase = DeployPhase.FAILED
         progress.error = e
         raise
@@ -43,10 +61,8 @@ async def build_node(
 async def push_node(
     node: NodeConfig,
     progress: NodeProgress,
-    *,
-    remote: bool = False,
 ) -> None:
-    if remote:
+    if node.remote_build:
         progress.phase = DeployPhase.DONE
         return
 
@@ -64,7 +80,7 @@ async def push_node(
             on_line=lambda line: progress.logs.append(line),
         )
         progress.phase = DeployPhase.DONE
-    except Exception as e:
+    except RuntimeError as e:
         progress.phase = DeployPhase.FAILED
         progress.error = e
         raise
@@ -91,7 +107,7 @@ async def activate_node(
             on_line=lambda line: progress.logs.append(line),
         )
         progress.phase = DeployPhase.DONE
-    except Exception as e:
+    except RuntimeError as e:
         progress.phase = DeployPhase.FAILED
         progress.error = e
         raise
@@ -136,7 +152,7 @@ async def run_phase(
         for t in tasks:
             try:
                 await t
-            except Exception:
+            except RuntimeError:
                 pass
 
         nodes_list = list(progress_map.values())
@@ -146,20 +162,15 @@ async def run_phase(
         sys.stdout.write(AnsiUI.SHOW)
         sys.stdout.flush()
 
-    failed = [n for n in nodes_list if n.phase == DeployPhase.FAILED]
-    if failed:
-        sys.exit(1)
-
 
 async def run_build(
     config: SnipConfig,
     node_names: list[str],
     *,
-    remote_override: bool | None = None,
     parallel: int | None = None,
 ) -> None:
     async def _phase(node: NodeConfig, progress: NodeProgress) -> None:
-        await build_node(node, progress, remote_override=remote_override)
+        await build_node(node, progress)
 
     await run_phase(
         config,
@@ -174,13 +185,11 @@ async def run_push(
     config: SnipConfig,
     node_names: list[str],
     *,
-    remote_override: bool | None = None,
     parallel: int | None = None,
 ) -> None:
     async def _phase(node: NodeConfig, progress: NodeProgress) -> None:
-        remote = remote_override if remote_override is not None else node.remote_build
-        await build_node(node, progress, remote_override=remote_override)
-        await push_node(node, progress, remote=remote)
+        await build_node(node, progress)
+        await push_node(node, progress)
 
     await run_phase(
         config,
@@ -227,13 +236,11 @@ async def run_deploy(
     config: SnipConfig,
     node_names: list[str],
     *,
-    remote_override: bool = False,
     parallel: int | None = None,
 ) -> None:
     async def _phase(node: NodeConfig, progress: NodeProgress) -> None:
-        remote = remote_override
-        await build_node(node, progress, remote_override=remote_override)
-        await push_node(node, progress, remote=remote)
+        await build_node(node, progress)
+        await push_node(node, progress)
         await activate_node(node, progress)
 
     await run_phase(
