@@ -1,9 +1,10 @@
 from __future__ import annotations
-import os
 
 import argparse
 import asyncio
+import os
 import re
+import signal
 import sys
 
 from snip.deploy import run_activate, run_build, run_deploy, run_push
@@ -92,6 +93,25 @@ async def config_loader(args: argparse.Namespace) -> SnipConfig:
 
 
 async def _async_main(args: argparse.Namespace) -> None:
+    loop = asyncio.get_running_loop()
+    main_task: asyncio.Task[None] | None = None
+
+    def _on_sigint() -> None:
+        if main_task is not None:
+            main_task.cancel()
+
+    loop.add_signal_handler(signal.SIGINT, _on_sigint)
+    try:
+        main_task = asyncio.create_task(_run(args))
+        await main_task
+    except asyncio.CancelledError:
+        print(f"\n{AnsiUI.AMBER}Cancelled.{AnsiUI.RESET}")
+        sys.exit(130)
+    finally:
+        loop.remove_signal_handler(signal.SIGINT)
+
+
+async def _run(args: argparse.Namespace) -> None:
     try:
         args.flake = os.path.realpath(args.flake)
         config = await config_loader(args)

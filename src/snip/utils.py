@@ -21,7 +21,12 @@ async def run(cmd: list[str], *, check: bool = True) -> tuple[str, str, int]:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, stderr = await proc.communicate()
+    try:
+        stdout, stderr = await proc.communicate()
+    except asyncio.CancelledError:
+        proc.terminate()
+        await proc.wait()
+        raise
     if check and proc.returncode != 0:
         raise RuntimeError(f"command: {' '.join(cmd)}\n{stderr.decode().strip()}")
     return stdout.decode(), stderr.decode(), proc.returncode or 0
@@ -56,10 +61,15 @@ async def run_streaming(
             cb(decoded)
         return "\n".join(buf)
 
-    stdout, stderr = await asyncio.gather(
-        _read(proc.stdout, on_stdout),
-        _read(proc.stderr, on_stderr),
-    )
+    try:
+        stdout, stderr = await asyncio.gather(
+            _read(proc.stdout, on_stdout),
+            _read(proc.stderr, on_stderr),
+        )
+    except asyncio.CancelledError:
+        proc.terminate()
+        await proc.wait()
+        raise
     if check and proc.returncode != 0:
         raise RuntimeError(f"command: {' '.join(cmd)}\n{stderr.strip()}")
     return stdout, stderr, proc.returncode or 0
