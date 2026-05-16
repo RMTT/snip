@@ -291,36 +291,26 @@ def render_deploy(nodes: list[NodeProgress], action: str) -> list[str]:
     return lines
 
 
-def render_node_table(nodes: Mapping[str, NodeConfig]) -> str:
-    count = len(nodes)
-    label = "node" if count == 1 else "nodes"
-    header = (
-        f"{AnsiUI.BOLD}snip list{AnsiUI.RESET} \u00bb"
-        f" {AnsiUI.AMBER}{count}{AnsiUI.RESET} {label} found in flake"
+def render_node_table(nodes: Mapping[str, NodeConfig], flake: str) -> list[str]:
+    lines = []
+
+    lines.append(
+        f"{AnsiUI.BOLD}snip list{AnsiUI.RESET} {AnsiUI.SLATE}"
+        f"» {len(nodes)} nodes found in {flake}{AnsiUI.RESET}"
     )
-    sep = f"{AnsiUI.VOID}{'━' * 55}{AnsiUI.RESET}"
+    rule_len = int(AnsiUI.max_column() / 2)
+    lines.append(f"{AnsiUI.VOID}{'━' * rule_len}{AnsiUI.RESET}")
 
-    dot = f"{AnsiUI.LIME}●{AnsiUI.RESET}"
-    bold = AnsiUI.BOLD
-    rst = AnsiUI.RESET
-
-    col_node = 20
-    col_system = 17
-    col_target = 22
-
-    hdr = (
-        f"   {bold}{'NODE':<{col_node}}{'SYSTEM':<{col_system}}"
-        f"{'TARGET':<{col_target}}USER{rst}"
-    )
-
-    lines: list[str] = [header, sep, hdr]
-
-    for name, node in nodes.items():
-        lines.append(
-            f"{dot}  {bold}{name:<{col_node}}{rst}"
-            f"{node.system:<{col_system}}"
-            f"{node.host:<{col_target}}"
-            f"{node.user}"
+    for name in nodes:
+        node = nodes[name]
+        icon = f"{AnsiUI.CYAN}●{AnsiUI.RESET}"
+        metadata = (
+            f"{icon} {AnsiUI.BOLD}{name}{AnsiUI.RESET}"
+            f" {AnsiUI.SLATE}{node.system}{AnsiUI.RESET}"
+            f" {AnsiUI.AMBER}·{AnsiUI.RESET} {node.host}"
+            f" {AnsiUI.AMBER}·{AnsiUI.RESET} {AnsiUI.SLATE}{node.user}{AnsiUI.RESET}"
         )
+        lines.append(metadata)
+        lines.append("")
 
-    return "\n".join(lines)
+    return lines

@@ -65,8 +65,12 @@ def _filter_nodes(config_nodes: dict, args: argparse.Namespace) -> list[str]:
 
 async def config_loader(args: argparse.Namespace) -> SnipConfig:
     async def _load() -> SnipConfig:
+        remote_build = False
+        if "remote_build" in args:
+            remote_build = args.remote_build
+
         config = await eval_snip_config(
-            flake_ref=args.flake, remote_override=args.remote_build
+            flake_ref=args.flake, remote_override=remote_build
         )
         extra_node_info = await eval_node_info(flake=args.flake)
         for node in extra_node_info:
@@ -126,7 +130,7 @@ async def _run(args: argparse.Namespace) -> None:
         print(msg)
 
     if args.command == "list":
-        print(render_node_table(config.nodes))
+        print("\n".join(render_node_table(config.nodes, args.flake)))
         return
 
     node_names = _filter_nodes(config.nodes, args)
