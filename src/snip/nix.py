@@ -92,7 +92,6 @@ async def copy_closure(
             "--to",
             f"ssh-ng://{ssh_target}",
             store_path,
-            "--accept-flake-config",
         ],
         on_stderr=on_line,
     )
