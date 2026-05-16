@@ -89,8 +89,9 @@ async def copy_closure(
         [
             "nix",
             "copy",
+            "--no-check-sigs",
             "--to",
-            f"ssh-ng://{ssh_target}",
+            f"ssh-ng://{ssh_target}?compress=true",
             store_path,
         ],
         on_stderr=on_line,
