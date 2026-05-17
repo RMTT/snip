@@ -25,42 +25,37 @@ class DeployStep(Protocol):
 
 class BuildStep:
     async def run(self, node: NodeConfig, progress: NodeProgress) -> None:
-        try:
-            progress.phase = DeployPhase.BUILDING
+        progress.phase = DeployPhase.BUILDING
 
-            progress.current_status = f"evaluating derivation for {node.name}"
-            drv_path = await nix.eval_toplevel_attr(node.config, "drvPath")
+        progress.current_status = f"evaluating derivation for {node.name}"
+        drv_path = await nix.eval_toplevel_attr(node.config, "drvPath")
 
-            if node.remote_build:
-                ssh_target = f"{node.user}@{node.host}"
-                progress.current_status = f"copying derivation to {node.host}"
-                await nix.copy_closure(
-                    drv_path,
-                    ssh_target,
-                    on_line=lambda line: progress.logs.append(line),
-                )
+        if node.remote_build:
+            ssh_target = f"{node.user}@{node.host}"
+            progress.current_status = f"copying derivation to {node.host}"
+            await nix.copy_closure(
+                drv_path,
+                ssh_target,
+                on_line=lambda line: progress.logs.append(line),
+            )
 
-                progress.current_status = f"building {node.name} on {node.host}"
-                progress.store_path = await ssh.realise(
-                    node.user,
-                    node.host,
-                    drv_path,
-                    port=node.port,
-                    ssh_options=node.ssh_options,
-                    on_line=lambda line: progress.logs.append(line),
-                )
-            else:
-                progress.current_status = f"building {node.name}"
-                progress.store_path = await nix.realise(
-                    drv_path,
-                    on_line=lambda line: progress.logs.append(line),
-                )
+            progress.current_status = f"building {node.name} on {node.host}"
+            progress.store_path = await ssh.realise(
+                node.user,
+                node.host,
+                drv_path,
+                port=node.port,
+                ssh_options=node.ssh_options,
+                on_line=lambda line: progress.logs.append(line),
+            )
+        else:
+            progress.current_status = f"building {node.name}"
+            progress.store_path = await nix.realise(
+                drv_path,
+                on_line=lambda line: progress.logs.append(line),
+            )
 
-            progress.phase = DeployPhase.DONE
-        except RuntimeError as e:
-            progress.phase = DeployPhase.FAILED
-            progress.error = e
-            raise
+        progress.phase = DeployPhase.DONE
 
 
 class PushStep:
@@ -74,19 +69,14 @@ class PushStep:
             progress.error = RuntimeError("no store path to push")
             raise progress.error
 
-        try:
-            progress.phase = DeployPhase.PUSHING
-            progress.current_status = f"pushing {node.config} to {node.host}"
-            await nix.copy_closure(
-                progress.store_path,
-                f"{node.user}@{node.host}",
-                on_line=lambda line: progress.logs.append(line),
-            )
-            progress.phase = DeployPhase.DONE
-        except RuntimeError as e:
-            progress.phase = DeployPhase.FAILED
-            progress.error = e
-            raise
+        progress.phase = DeployPhase.PUSHING
+        progress.current_status = f"pushing {node.config} to {node.host}"
+        await nix.copy_closure(
+            progress.store_path,
+            f"{node.user}@{node.host}",
+            on_line=lambda line: progress.logs.append(line),
+        )
+        progress.phase = DeployPhase.DONE
 
 
 class ActivateStep:
@@ -96,37 +86,27 @@ class ActivateStep:
             progress.error = RuntimeError("no store path to activate")
             raise progress.error
 
-        try:
-            progress.phase = DeployPhase.ACTIVATING
-            progress.current_status = f"activating {node.config} on {node.host}"
+        progress.phase = DeployPhase.ACTIVATING
+        progress.current_status = f"activating {node.config} on {node.host}"
 
-            await ssh.activate(
-                node.user,
-                node.host,
-                progress.store_path,
-                port=node.port,
-                ssh_options=node.ssh_options,
-                on_line=lambda line: progress.logs.append(line),
-            )
-            progress.phase = DeployPhase.DONE
-        except RuntimeError as e:
-            progress.phase = DeployPhase.FAILED
-            progress.error = e
-            raise
+        await ssh.activate(
+            node.user,
+            node.host,
+            progress.store_path,
+            port=node.port,
+            ssh_options=node.ssh_options,
+            on_line=lambda line: progress.logs.append(line),
+        )
+        progress.phase = DeployPhase.DONE
 
 
 class EvalStorePathStep:
     async def run(self, node: NodeConfig, progress: NodeProgress) -> None:
-        try:
-            progress.phase = DeployPhase.BUILDING
-            progress.current_status = f"resolving store path for {node.name}"
-            store_path = await nix.eval_toplevel_attr(node.config, "outPath")
-            progress.store_path = store_path
-            progress.phase = DeployPhase.DONE
-        except Exception as e:
-            progress.phase = DeployPhase.FAILED
-            progress.error = e
-            raise
+        progress.phase = DeployPhase.BUILDING
+        progress.current_status = f"resolving store path for {node.name}"
+        store_path = await nix.eval_toplevel_attr(node.config, "outPath")
+        progress.store_path = store_path
+        progress.phase = DeployPhase.DONE
 
 
 def _save_failed_logs(progress_map: dict[str, NodeProgress]) -> None:
