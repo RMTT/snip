@@ -7,6 +7,10 @@ from snip.models import SnipConfig
 from snip.utils import run as _run
 from snip.utils import run_streaming as _run_streaming
 
+# ----------------------------------------------------------------------------
+# Nix Expressions
+# ----------------------------------------------------------------------------
+
 _APPLY_STRIP_CONFIG = r"""
 x: {
   defaults = x.defaults or { };
@@ -39,10 +43,9 @@ in
 """
 
 
-async def eval_node_info(flake: str) -> dict[str, dict[str, str]]:
-    expr = _GET_NODE_INFO.replace("<flakePath>", flake)
-    stdout, _, _ = await _run(["nix", "eval", "--impure", "--json", "--expr", expr])
-    return json.loads(stdout)
+# ----------------------------------------------------------------------------
+# Configuration Evaluation
+# ----------------------------------------------------------------------------
 
 
 async def eval_snip_config(
@@ -60,6 +63,29 @@ async def eval_snip_config(
     return SnipConfig.from_json(flake_ref, data)
 
 
+async def eval_node_info(flake: str) -> dict[str, dict[str, str]]:
+    expr = _GET_NODE_INFO.replace("<flakePath>", flake)
+    stdout, _, _ = await _run(["nix", "eval", "--impure", "--json", "--expr", expr])
+    return json.loads(stdout)
+
+
+# ----------------------------------------------------------------------------
+# Nix Store & Build Operations
+# ----------------------------------------------------------------------------
+
+
+async def eval_drvpath(config_path: str) -> str:
+    attr = f"{config_path}.config.system.build.toplevel.drvPath"
+    stdout, _, _ = await _run(["nix", "eval", "--raw", attr])
+    return stdout.strip()
+
+
+async def eval_toplevel_outpath(config_path: str) -> str:
+    attr = f"{config_path}.config.system.build.toplevel.outPath"
+    stdout, _, _ = await _run(["nix", "eval", "--raw", attr])
+    return stdout.strip()
+
+
 async def realise(
     drv_path: str,
     *,
@@ -69,12 +95,6 @@ async def realise(
     stdout, stderr, rc = await _run_streaming(cmd, on_stderr=on_line, check=False)
     if rc != 0:
         raise RuntimeError(f"nix-store --realise failed: {stderr.strip()}")
-    return stdout.strip()
-
-
-async def eval_drvpath(config_path: str) -> str:
-    attr = f"{config_path}.config.system.build.toplevel.drvPath"
-    stdout, _, _ = await _run(["nix", "eval", "--raw", attr])
     return stdout.strip()
 
 
@@ -95,9 +115,3 @@ async def copy_closure(
         ],
         on_stderr=on_line,
     )
-
-
-async def eval_toplevel_outpath(config_path: str) -> str:
-    attr = f"{config_path}.config.system.build.toplevel.outPath"
-    stdout, _, _ = await _run(["nix", "eval", "--raw", attr])
-    return stdout.strip()
