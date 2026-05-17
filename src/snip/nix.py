@@ -11,35 +11,31 @@ from snip.utils import run_streaming as _run_streaming
 # Nix Expressions
 # ----------------------------------------------------------------------------
 
-_APPLY_STRIP_CONFIG = r"""
-x: {
-  defaults = x.defaults or { };
-  nodes = builtins.mapAttrs (
-    n: v:
-    let
-      hasConfig = v ? config && v.config != null && v.config != "";
-      targetAttr = if hasConfig then "snip.nodes.${n}.config" else "";
-    in
-    (builtins.removeAttrs v [ "config" ]) // { config = targetAttr; }
-  ) x.nodes;
-}
-"""
-
-_GET_NODE_INFO = r"""
+_EVAL_SNIP_CONFIG = r"""
 let
   flake = builtins.getFlake (builtins.toString <flakePath>);
-  nodes = flake.snip.nodes or {};
+  snipConfig = flake.snip or {};
   
-  extract = name: node:
+  defaults = snipConfig.defaults or {};
+  nodes = snipConfig.nodes or {};
+
+  processNode = name: v:
     let
-      cfg = if (node ? config && node.config != "") then node.config 
-            else flake.nixosConfigurations.${name};
-    in {
-      system = cfg.config.nixpkgs.hostPlatform.system;
-      path = builtins.toString cfg.config.system.build.toplevel;
+      hasConfig = v ? config && v.config != null && v.config != "";
+      targetAttr = if hasConfig then "snip.nodes.${name}.config" else "";
+      cfg = if hasConfig then v.config else flake.nixosConfigurations.${name};
+      sys = cfg.config.nixpkgs.hostPlatform.system or "unknown";
+      out = builtins.toString cfg.config.system.build.toplevel;
+    in
+    (builtins.removeAttrs v [ "config" ]) // {
+      config = targetAttr;
+      system = sys;
+      out_path = out;
     };
-in
-  builtins.mapAttrs extract nodes
+in {
+  defaults = defaults;
+  nodes = builtins.mapAttrs processNode nodes;
+}
 """
 
 
@@ -51,7 +47,8 @@ in
 async def eval_snip_config(
     flake_ref: str = ".", remote_override: bool = False
 ) -> SnipConfig:
-    cmd = ["nix", "eval", "--json", f"{flake_ref}#snip", "--apply", _APPLY_STRIP_CONFIG]
+    expr = _EVAL_SNIP_CONFIG.replace("<flakePath>", flake_ref)
+    cmd = ["nix", "eval", "--impure", "--json", "--expr", expr]
     stdout, _, _ = await _run(cmd)
     data: dict = json.loads(stdout)
 
@@ -61,12 +58,6 @@ async def eval_snip_config(
             node["remoteBuild"] = remote_override
 
     return SnipConfig.from_json(flake_ref, data)
-
-
-async def eval_node_info(flake: str) -> dict[str, dict[str, str]]:
-    expr = _GET_NODE_INFO.replace("<flakePath>", flake)
-    stdout, _, _ = await _run(["nix", "eval", "--impure", "--json", "--expr", expr])
-    return json.loads(stdout)
 
 
 # ----------------------------------------------------------------------------
