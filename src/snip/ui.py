@@ -191,25 +191,6 @@ class Components:
 
         lines.append(f" {sp}")
 
-        # print logs
-        logs = getattr(node, "logs", [])
-        if not logs:
-            lines.append(
-                f" {AnsiUI.RED}└─{AnsiUI.RESET}"
-                f" {AnsiUI.SLATE}(No logs captured){AnsiUI.RESET}"
-            )
-            return lines
-
-        tail_logs = logs[-5:]
-        hint = "Last 5 lines of log" if len(logs) > 5 else "Full log output"
-
-        lines.append(f" {sp} {AnsiUI.AMBER}{hint}:{AnsiUI.RESET}")
-
-        log_max_w = max(10, AnsiUI.max_column() - 3)
-        for log in tail_logs:
-            safe_log = log if len(log) <= log_max_w else log[: log_max_w - 3] + "..."
-            lines.append(f" {sp} {safe_log}")
-
         if node.log_path:
             lines.append(
                 f" {AnsiUI.RED}└─{AnsiUI.RESET}"
@@ -237,7 +218,7 @@ class DeployPhase(Enum):
 class NodeProgress:
     name: str
     phase: DeployPhase = DeployPhase.QUEUED
-    logs: deque[str] = field(default_factory=lambda: deque(maxlen=10))
+    logs: list[str] = field(default_factory=list)
     current_status: str = "preparing"
     error: Exception | None = None
     store_path: str | None = None
