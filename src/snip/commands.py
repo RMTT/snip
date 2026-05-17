@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import fnmatch
 import re
+import sys
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 from snip.deploy import run_activate, run_build, run_deploy, run_push
-from snip.ui import AnsiUI, render_node_table
+from snip.nix import eval_system
+from snip.ui import AnsiUI, ListProgress, render_dynamic_node_table, rewrite_display
 
 if TYPE_CHECKING:
     from snip.models import SnipConfig
@@ -50,7 +53,35 @@ async def _handle_command(
 
 
 async def list_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
-    print("\n".join(render_node_table(config.nodes, args.flake)))
+    progress_map = {name: ListProgress() for name in config.nodes}
+    tasks = []
+
+    async def _fetch_system(name: str, config_path: str) -> None:
+        try:
+            sys_val = await eval_system(config_path)
+            progress_map[name].system = sys_val
+        except Exception:
+            progress_map[name].system = "unknown"
+        finally:
+            progress_map[name].done = True
+
+    for name, node in config.nodes.items():
+        tasks.append(asyncio.create_task(_fetch_system(name, node.config)))
+
+    sys.stdout.write(AnsiUI.HIDE)
+    frame_height = 0
+    try:
+        while not all(t.done() for t in tasks):
+            frame = render_dynamic_node_table(config.nodes, args.flake, progress_map)
+            frame_height = rewrite_display(frame_height, frame)
+            await asyncio.sleep(0.1)
+
+        # Final render
+        frame = render_dynamic_node_table(config.nodes, args.flake, progress_map)
+        rewrite_display(frame_height, frame)
+    finally:
+        sys.stdout.write(AnsiUI.SHOW)
+        sys.stdout.flush()
 
 
 async def deploy_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
