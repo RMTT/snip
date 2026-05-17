@@ -15,7 +15,7 @@ _EVAL_SNIP_CONFIG = r"""
 let
   flake = builtins.getFlake (builtins.toString <flakePath>);
   snipConfig = flake.snip or {};
-  
+
   defaults = snipConfig.defaults or {};
   nodes = snipConfig.nodes or {};
 
@@ -65,14 +65,8 @@ async def eval_snip_config(
 # ----------------------------------------------------------------------------
 
 
-async def eval_drvpath(config_path: str) -> str:
-    attr = f"{config_path}.config.system.build.toplevel.drvPath"
-    stdout, _, _ = await _run(["nix", "eval", "--raw", attr])
-    return stdout.strip()
-
-
-async def eval_toplevel_outpath(config_path: str) -> str:
-    attr = f"{config_path}.config.system.build.toplevel.outPath"
+async def eval_toplevel_attr(config_path: str, attr_name: str) -> str:
+    attr = f"{config_path}.config.system.build.toplevel.{attr_name}"
     stdout, _, _ = await _run(["nix", "eval", "--raw", attr])
     return stdout.strip()
 

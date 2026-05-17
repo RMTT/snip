@@ -29,7 +29,7 @@ class BuildStep:
             progress.phase = DeployPhase.BUILDING
 
             progress.current_status = f"evaluating derivation for {node.name}"
-            drv_path = await nix.eval_drvpath(node.config)
+            drv_path = await nix.eval_toplevel_attr(node.config, "drvPath")
 
             if node.remote_build:
                 ssh_target = f"{node.user}@{node.host}"
@@ -120,7 +120,7 @@ class EvalStorePathStep:
         try:
             progress.phase = DeployPhase.BUILDING
             progress.current_status = f"resolving store path for {node.name}"
-            store_path = await nix.eval_toplevel_outpath(node.config)
+            store_path = await nix.eval_toplevel_attr(node.config, "outPath")
             progress.store_path = store_path
             progress.phase = DeployPhase.DONE
         except Exception as e:
