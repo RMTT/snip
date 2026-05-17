@@ -6,3 +6,4 @@ __pycache__/
 dist
 .envrc
 result
+*.qcow2
