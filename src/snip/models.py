@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import getpass
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass
@@ -58,11 +57,9 @@ class NodeConfig:
             remote_build=data.get("remoteBuild", defaults.remote_build),
             ssh_options=data.get("sshOptions", defaults.ssh_options),
             config=config,
+            system=data.get("system", "unknown"),
+            out_path=data.get("out_path", None),
         )
-
-    def update_nodeinfo(self, nodeinfo: dict[str, Any]) -> None:
-        self.system = nodeinfo.get("system", "unknown")
-        self.out_path = nodeinfo.get("out_path", None)
 
 
 @dataclass

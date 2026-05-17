@@ -8,7 +8,7 @@ import sys
 
 from snip.commands import activate_cmd, build_cmd, deploy_cmd, list_cmd, push_cmd
 from snip.models import SnipConfig
-from snip.nix import eval_node_info, eval_snip_config
+from snip.nix import eval_snip_config
 from snip.ui import AnsiUI, Components, rewrite_display
 
 
@@ -61,23 +61,14 @@ async def config_loader(args: argparse.Namespace) -> SnipConfig:
         if "remote_build" in args:
             remote_build = args.remote_build
 
-        config_task = eval_snip_config(
+        return await eval_snip_config(
             flake_ref=args.flake, remote_override=remote_build
         )
-        info_task = eval_node_info(flake=args.flake)
 
-        config, extra_node_info = await asyncio.gather(config_task, info_task)
-
-        for node in extra_node_info:
-            if node in config.nodes:
-                config.nodes[node].update_nodeinfo(extra_node_info[node])
-
-        return config
-
-    tasks = asyncio.create_task(_load())
+    task = asyncio.create_task(_load())
     frame_height = 0
     try:
-        while not tasks.done():
+        while not task.done():
             lines = Components.eval_loader(args.flake, False)
 
             rewrite_display(frame_height, lines)
@@ -85,7 +76,7 @@ async def config_loader(args: argparse.Namespace) -> SnipConfig:
 
             await asyncio.sleep(0.2)
 
-        nodes_data = await tasks
+        nodes_data = await task
         lines = Components.eval_loader(args.flake, True)
         rewrite_display(frame_height, lines)
         return nodes_data

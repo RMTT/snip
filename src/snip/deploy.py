@@ -5,8 +5,8 @@ import os
 import sys
 import tempfile
 import time
-from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Protocol
 
 from snip import nix, ssh
 from snip.models import NodeConfig, SnipConfig
@@ -19,15 +19,16 @@ from snip.ui import (
 )
 
 
-async def build_node(
-    node: NodeConfig,
-    progress: NodeProgress,
-) -> None:
-    try:
+class DeployStep(Protocol):
+    async def run(self, node: NodeConfig, progress: NodeProgress) -> None: ...
+
+
+class BuildStep:
+    async def run(self, node: NodeConfig, progress: NodeProgress) -> None:
         progress.phase = DeployPhase.BUILDING
 
         progress.current_status = f"evaluating derivation for {node.name}"
-        drv_path = await nix.eval_drvpath(node.config)
+        drv_path = await nix.eval_toplevel_attr(node.config, "drvPath")
 
         if node.remote_build:
             ssh_target = f"{node.user}@{node.host}"
@@ -55,26 +56,19 @@ async def build_node(
             )
 
         progress.phase = DeployPhase.DONE
-    except RuntimeError as e:
-        progress.phase = DeployPhase.FAILED
-        progress.error = e
-        raise
 
 
-async def push_node(
-    node: NodeConfig,
-    progress: NodeProgress,
-) -> None:
-    if node.remote_build:
-        progress.phase = DeployPhase.DONE
-        return
+class PushStep:
+    async def run(self, node: NodeConfig, progress: NodeProgress) -> None:
+        if node.remote_build:
+            progress.phase = DeployPhase.DONE
+            return
 
-    if progress.store_path is None:
-        progress.phase = DeployPhase.FAILED
-        progress.error = RuntimeError("no store path to push")
-        raise progress.error
+        if progress.store_path is None:
+            progress.phase = DeployPhase.FAILED
+            progress.error = RuntimeError("no store path to push")
+            raise progress.error
 
-    try:
         progress.phase = DeployPhase.PUSHING
         progress.current_status = f"pushing {node.config} to {node.host}"
         await nix.copy_closure(
@@ -83,22 +77,15 @@ async def push_node(
             on_line=lambda line: progress.logs.append(line),
         )
         progress.phase = DeployPhase.DONE
-    except RuntimeError as e:
-        progress.phase = DeployPhase.FAILED
-        progress.error = e
-        raise
 
 
-async def activate_node(
-    node: NodeConfig,
-    progress: NodeProgress,
-) -> None:
-    if progress.store_path is None:
-        progress.phase = DeployPhase.FAILED
-        progress.error = RuntimeError("no store path to activate")
-        raise progress.error
+class ActivateStep:
+    async def run(self, node: NodeConfig, progress: NodeProgress) -> None:
+        if progress.store_path is None:
+            progress.phase = DeployPhase.FAILED
+            progress.error = RuntimeError("no store path to activate")
+            raise progress.error
 
-    try:
         progress.phase = DeployPhase.ACTIVATING
         progress.current_status = f"activating {node.config} on {node.host}"
 
@@ -111,10 +98,15 @@ async def activate_node(
             on_line=lambda line: progress.logs.append(line),
         )
         progress.phase = DeployPhase.DONE
-    except RuntimeError as e:
-        progress.phase = DeployPhase.FAILED
-        progress.error = e
-        raise
+
+
+class EvalStorePathStep:
+    async def run(self, node: NodeConfig, progress: NodeProgress) -> None:
+        progress.phase = DeployPhase.BUILDING
+        progress.current_status = f"resolving store path for {node.name}"
+        store_path = await nix.eval_toplevel_attr(node.config, "outPath")
+        progress.store_path = store_path
+        progress.phase = DeployPhase.DONE
 
 
 def _save_failed_logs(progress_map: dict[str, NodeProgress]) -> None:
@@ -132,16 +124,16 @@ def _save_failed_logs(progress_map: dict[str, NodeProgress]) -> None:
         progress.log_path = log_path_str
 
 
-async def run_phase(
+async def run_steps(
     config: SnipConfig,
     node_names: list[str],
-    phase_fn: Callable[[NodeConfig, NodeProgress], Awaitable[None]],
+    steps: list[DeployStep],
     action_label: str,
     parallel: int | None = None,
 ) -> None:
-    progress_map: dict[str, NodeProgress] = {}
-    for name in node_names:
-        progress_map[name] = NodeProgress(name=name)
+    progress_map: dict[str, NodeProgress] = {
+        name: NodeProgress(name=name) for name in node_names
+    }
 
     semaphore = asyncio.Semaphore(parallel or len(node_names))
 
@@ -150,11 +142,13 @@ async def run_phase(
         progress = progress_map[name]
         async with semaphore:
             try:
-                await phase_fn(node, progress)
+                for step in steps:
+                    await step.run(node, progress)
+                progress.phase = DeployPhase.DONE
             except Exception as e:
-                progress.phase = DeployPhase.FAILED
-                progress.error = e
-                raise
+                if progress.error is None:
+                    progress.phase = DeployPhase.FAILED
+                    progress.error = e
 
     tasks = [asyncio.create_task(_run(name)) for name in node_names]
 
@@ -188,13 +182,10 @@ async def run_build(
     node_names: list[str],
     parallel: int | None = None,
 ) -> None:
-    async def _phase(node: NodeConfig, progress: NodeProgress) -> None:
-        await build_node(node, progress)
-
-    await run_phase(
+    await run_steps(
         config,
         node_names,
-        _phase,
+        [BuildStep()],
         action_label="building",
         parallel=parallel,
     )
@@ -205,30 +196,13 @@ async def run_push(
     node_names: list[str],
     parallel: int | None = None,
 ) -> None:
-    async def _phase(node: NodeConfig, progress: NodeProgress) -> None:
-        await build_node(node, progress)
-        await push_node(node, progress)
-
-    await run_phase(
+    await run_steps(
         config,
         node_names,
-        _phase,
+        [BuildStep(), PushStep()],
         action_label="pushing",
         parallel=parallel,
     )
-
-
-async def eval_store_path(node: NodeConfig, progress: NodeProgress) -> None:
-    try:
-        progress.phase = DeployPhase.BUILDING
-        progress.current_status = f"resolving store path for {node.name}"
-        store_path = await nix.eval_toplevel_outpath(node.config)
-        progress.store_path = store_path
-        progress.phase = DeployPhase.DONE
-    except Exception as e:
-        progress.phase = DeployPhase.FAILED
-        progress.error = e
-        raise
 
 
 async def run_activate(
@@ -236,14 +210,10 @@ async def run_activate(
     node_names: list[str],
     parallel: int | None = None,
 ) -> None:
-    async def _phase(node: NodeConfig, progress: NodeProgress) -> None:
-        await eval_store_path(node, progress)
-        await activate_node(node, progress)
-
-    await run_phase(
+    await run_steps(
         config,
         node_names,
-        _phase,
+        [EvalStorePathStep(), ActivateStep()],
         action_label="activating",
         parallel=parallel,
     )
@@ -254,15 +224,10 @@ async def run_deploy(
     node_names: list[str],
     parallel: int | None = None,
 ) -> None:
-    async def _phase(node: NodeConfig, progress: NodeProgress) -> None:
-        await build_node(node, progress)
-        await push_node(node, progress)
-        await activate_node(node, progress)
-
-    await run_phase(
+    await run_steps(
         config,
         node_names,
-        _phase,
+        [BuildStep(), PushStep(), ActivateStep()],
         action_label="deploying",
         parallel=parallel,
     )
