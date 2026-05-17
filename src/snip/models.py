@@ -40,7 +40,6 @@ class NodeConfig:
     ssh_options: list[str]
     config: str
     system: str = "unknown"
-    out_path: str | None = None
 
     @classmethod
     def from_json(
@@ -58,7 +57,6 @@ class NodeConfig:
             ssh_options=data.get("sshOptions", defaults.ssh_options),
             config=config,
             system=data.get("system", "unknown"),
-            out_path=data.get("out_path", None),
         )
 
 

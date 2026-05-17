@@ -245,6 +245,12 @@ class NodeProgress:
     start_time: float = field(default_factory=time.time)
 
 
+@dataclass
+class ListProgress:
+    done: bool = False
+    system: str = "unknown"
+
+
 def _status_from_phase(phase: DeployPhase) -> str:
     if phase == DeployPhase.DONE:
         return "ok"
@@ -297,7 +303,11 @@ def render_deploy(nodes: list[NodeProgress], action: str) -> list[str]:
     return lines
 
 
-def render_node_table(nodes: Mapping[str, NodeConfig], flake: str) -> list[str]:
+def render_dynamic_node_table(
+    nodes: Mapping[str, NodeConfig],
+    flake: str,
+    progress: Mapping[str, ListProgress],
+) -> list[str]:
     lines = []
 
     lines.append(
@@ -307,12 +317,17 @@ def render_node_table(nodes: Mapping[str, NodeConfig], flake: str) -> list[str]:
     rule_len = int(AnsiUI.max_column() / 2)
     lines.append(f"{AnsiUI.VOID}{'━' * rule_len}{AnsiUI.RESET}")
 
-    for name in nodes:
-        node = nodes[name]
-        icon = f"{AnsiUI.CYAN}●{AnsiUI.RESET}"
+    for name, node in nodes.items():
+        node_progress = progress.get(name, ListProgress())
+        icon = (
+            f"{AnsiUI.CYAN}●{AnsiUI.RESET}"
+            if node_progress.done
+            else f"{AnsiUI.CYAN}{next(Components._SPINNER)}{AnsiUI.RESET}"
+        )
+        system_str = node_progress.system if node_progress.done else "evaluating..."
         metadata = (
             f"{icon} {AnsiUI.BOLD}{name}{AnsiUI.RESET}"
-            f" {AnsiUI.SLATE}{node.system}{AnsiUI.RESET}"
+            f" {AnsiUI.SLATE}{system_str}{AnsiUI.RESET}"
             f" {AnsiUI.AMBER}·{AnsiUI.RESET} {node.host}"
             f" {AnsiUI.AMBER}·{AnsiUI.RESET} {AnsiUI.SLATE}{node.user}{AnsiUI.RESET}"
         )

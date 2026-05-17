@@ -24,13 +24,9 @@ let
       hasConfig = v ? config && v.config != null && v.config != "";
       targetAttr = if hasConfig then "snip.nodes.${name}.config" else "";
       cfg = if hasConfig then v.config else flake.nixosConfigurations.${name};
-      sys = cfg.config.nixpkgs.hostPlatform.system or "unknown";
-      out = builtins.toString cfg.config.system.build.toplevel;
     in
     (builtins.removeAttrs v [ "config" ]) // {
       config = targetAttr;
-      system = sys;
-      out_path = out;
     };
 in {
   defaults = defaults;
@@ -67,6 +63,12 @@ async def eval_snip_config(
 
 async def eval_toplevel_attr(config_path: str, attr_name: str) -> str:
     attr = f"{config_path}.config.system.build.toplevel.{attr_name}"
+    stdout, _, _ = await _run(["nix", "eval", "--raw", attr])
+    return stdout.strip()
+
+
+async def eval_system(config_path: str) -> str:
+    attr = f"{config_path}.config.nixpkgs.hostPlatform.system"
     stdout, _, _ = await _run(["nix", "eval", "--raw", attr])
     return stdout.strip()
 
