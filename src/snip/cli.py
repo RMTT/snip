@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import fnmatch
 import os
-import re
 import signal
 import sys
 
-from snip.deploy import run_activate, run_build, run_deploy, run_push
+from snip.commands import activate_cmd, build_cmd, deploy_cmd, list_cmd, push_cmd
 from snip.models import SnipConfig
 from snip.nix import eval_node_info, eval_snip_config
-from snip.ui import AnsiUI, Components, render_node_table, rewrite_display
+from snip.ui import AnsiUI, Components, rewrite_display
 
 
 def _add_common_args(p: argparse.ArgumentParser) -> None:
@@ -31,37 +29,30 @@ def _build_parser() -> argparse.ArgumentParser:
     deploy_p.add_argument(
         "--remote-build", action="store_true", help="force remote builds"
     )
+    deploy_p.set_defaults(func=deploy_cmd)
 
     build_p = sub.add_parser("build", help="Build only")
     _add_common_args(build_p)
     build_p.add_argument(
         "--remote-build", action="store_true", help="force remote builds"
     )
+    build_p.set_defaults(func=build_cmd)
 
     push_p = sub.add_parser("push", help="Build + copy")
     _add_common_args(push_p)
     push_p.add_argument(
         "--remote-build", action="store_true", help="force remote builds"
     )
+    push_p.set_defaults(func=push_cmd)
 
     activate_p = sub.add_parser("activate", help="Activate already-pushed nodes")
     _add_common_args(activate_p)
+    activate_p.set_defaults(func=activate_cmd)
 
-    sub.add_parser("list", help="List all nodes")
+    list_p = sub.add_parser("list", help="List all nodes")
+    list_p.set_defaults(func=list_cmd)
 
     return parser
-
-
-def _parse_patterns(raw: list[str]) -> list[re.Pattern[str]]:
-    return [re.compile(fnmatch.translate(p)) for p in raw if p]
-
-
-def _filter_nodes(config_nodes: dict, args: argparse.Namespace) -> list[str]:
-    names = list(config_nodes.keys())
-    if hasattr(args, "nodes") and args.nodes:
-        patterns = _parse_patterns(args.nodes)
-        names = [n for n in names if any(p.match(n) for p in patterns)]
-    return names
 
 
 async def config_loader(args: argparse.Namespace) -> SnipConfig:
@@ -135,46 +126,7 @@ async def _run(args: argparse.Namespace) -> None:
         print(msg)
         return
 
-    if args.command == "list":
-        print("\n".join(render_node_table(config.nodes, args.flake)))
-        return
-
-    node_names = _filter_nodes(config.nodes, args)
-
-    if not node_names:
-        print(f"{AnsiUI.AMBER}No matching nodes found{AnsiUI.RESET}")
-        return
-
-    if args.dry_run:
-        print(
-            f"{AnsiUI.BOLD}Dry run:{AnsiUI.RESET} would deploy: {', '.join(node_names)}"
-        )
-        return
-
-    if args.command == "deploy":
-        await run_deploy(
-            config,
-            node_names,
-            parallel=args.parallel,
-        )
-    elif args.command == "build":
-        await run_build(
-            config,
-            node_names,
-            parallel=args.parallel,
-        )
-    elif args.command == "push":
-        await run_push(
-            config,
-            node_names,
-            parallel=args.parallel,
-        )
-    elif args.command == "activate":
-        await run_activate(
-            config,
-            node_names,
-            parallel=args.parallel,
-        )
+    await args.func(args, config)
 
 
 def main() -> None:
