@@ -136,7 +136,6 @@ async def run_phase(
     config: SnipConfig,
     node_names: list[str],
     phase_fn: Callable[[NodeConfig, NodeProgress], Awaitable[None]],
-    *,
     action_label: str,
     parallel: int | None = None,
 ) -> None:
@@ -187,7 +186,6 @@ async def run_phase(
 async def run_build(
     config: SnipConfig,
     node_names: list[str],
-    *,
     parallel: int | None = None,
 ) -> None:
     async def _phase(node: NodeConfig, progress: NodeProgress) -> None:
@@ -205,7 +203,6 @@ async def run_build(
 async def run_push(
     config: SnipConfig,
     node_names: list[str],
-    *,
     parallel: int | None = None,
 ) -> None:
     async def _phase(node: NodeConfig, progress: NodeProgress) -> None:
@@ -237,7 +234,6 @@ async def eval_store_path(node: NodeConfig, progress: NodeProgress) -> None:
 async def run_activate(
     config: SnipConfig,
     node_names: list[str],
-    *,
     parallel: int | None = None,
 ) -> None:
     async def _phase(node: NodeConfig, progress: NodeProgress) -> None:
@@ -256,7 +252,6 @@ async def run_activate(
 async def run_deploy(
     config: SnipConfig,
     node_names: list[str],
-    *,
     parallel: int | None = None,
 ) -> None:
     async def _phase(node: NodeConfig, progress: NodeProgress) -> None:

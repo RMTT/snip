@@ -28,7 +28,7 @@ def _filter_nodes(config_nodes: dict, args: argparse.Namespace) -> list[str]:
 async def _handle_command(
     args: argparse.Namespace,
     config: SnipConfig,
-    action_fn: Callable[[SnipConfig, list[str], int | None], Awaitable[None]],
+    action_fn: Callable[..., Awaitable[None]],
 ) -> None:
     node_names = _filter_nodes(config.nodes, args)
 
