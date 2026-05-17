@@ -335,28 +335,3 @@ def render_dynamic_node_table(
         lines.append("")
 
     return lines
-
-
-def render_node_table(nodes: Mapping[str, NodeConfig], flake: str) -> list[str]:
-    lines = []
-
-    lines.append(
-        f"{AnsiUI.BOLD}snip list{AnsiUI.RESET} {AnsiUI.SLATE}"
-        f"» {len(nodes)} nodes found in {flake}{AnsiUI.RESET}"
-    )
-    rule_len = int(AnsiUI.max_column() / 2)
-    lines.append(f"{AnsiUI.VOID}{'━' * rule_len}{AnsiUI.RESET}")
-
-    for name in nodes:
-        node = nodes[name]
-        icon = f"{AnsiUI.CYAN}●{AnsiUI.RESET}"
-        metadata = (
-            f"{icon} {AnsiUI.BOLD}{name}{AnsiUI.RESET}"
-            f" {AnsiUI.SLATE}{node.system}{AnsiUI.RESET}"
-            f" {AnsiUI.AMBER}·{AnsiUI.RESET} {node.host}"
-            f" {AnsiUI.AMBER}·{AnsiUI.RESET} {AnsiUI.SLATE}{node.user}{AnsiUI.RESET}"
-        )
-        lines.append(metadata)
-        lines.append("")
-
-    return lines

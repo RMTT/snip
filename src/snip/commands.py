@@ -74,7 +74,7 @@ async def list_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
         while not all(t.done() for t in tasks):
             frame = render_dynamic_node_table(config.nodes, args.flake, progress_map)
             frame_height = rewrite_display(frame_height, frame)
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.2)
 
         # Final render
         frame = render_dynamic_node_table(config.nodes, args.flake, progress_map)
