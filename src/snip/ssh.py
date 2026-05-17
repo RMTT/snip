@@ -7,7 +7,7 @@ from snip.utils import run_streaming as _run_streaming
 
 _IGNORE_HOSTS_OPTIONS = [
     "-o",
-    "StrictHostKeyChecking=no",
+    "StrictHostKeyChecking=accept-new",
 ]
 
 

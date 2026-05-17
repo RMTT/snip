@@ -6,12 +6,11 @@ import shutil
 import sys
 import textwrap
 import time
+from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
-
-from snip.utils import BoundedList
 
 if TYPE_CHECKING:
     from snip.models import NodeConfig
@@ -99,7 +98,7 @@ class Components:
         subtitle_color = f"{AnsiUI.CYAN}"
         if node.phase == DeployPhase.FAILED:
             subtitle_color = AnsiUI.RED
-        max_log_width = AnsiUI.max_column() - 3
+        max_log_width = max(10, AnsiUI.max_column() - 3)
         if len(node.logs) > 0:
             latest_log = node.logs[-1]
             if len(latest_log) > max_log_width:
@@ -175,7 +174,7 @@ class Components:
 
         error_msg = str(node.error)
 
-        max_w = AnsiUI.max_column() - 3
+        max_w = max(10, AnsiUI.max_column() - 3)
 
         is_first_line = True
         for raw_line in str(error_msg).split("\n"):
@@ -206,15 +205,21 @@ class Components:
 
         lines.append(f" {sp} {AnsiUI.AMBER}{hint}:{AnsiUI.RESET}")
 
-        log_max_w = AnsiUI.max_column() - 3
+        log_max_w = max(10, AnsiUI.max_column() - 3)
         for log in tail_logs:
             safe_log = log if len(log) <= log_max_w else log[: log_max_w - 3] + "..."
             lines.append(f" {sp} {safe_log}")
 
-        lines.append(
-            f" {AnsiUI.RED}└─{AnsiUI.RESET}"
-            f" {AnsiUI.SLATE}📝Full log saved to /tmp/snip-{node.name}.log{AnsiUI.RESET}"
-        )
+        if node.log_path:
+            lines.append(
+                f" {AnsiUI.RED}└─{AnsiUI.RESET}"
+                f" {AnsiUI.SLATE}📝Full log saved to {node.log_path}{AnsiUI.RESET}"
+            )
+        else:
+            lines.append(
+                f" {AnsiUI.RED}└─{AnsiUI.RESET}"
+                f" {AnsiUI.SLATE}📝Full log not saved{AnsiUI.RESET}"
+            )
 
         return lines
 
@@ -232,10 +237,11 @@ class DeployPhase(Enum):
 class NodeProgress:
     name: str
     phase: DeployPhase = DeployPhase.QUEUED
-    logs: list[str] = field(default_factory=lambda: BoundedList(10))
+    logs: deque[str] = field(default_factory=lambda: deque(maxlen=10))
     current_status: str = "preparing"
     error: Exception | None = None
     store_path: str | None = None
+    log_path: str | None = None
     start_time: float = field(default_factory=time.time)
 
 

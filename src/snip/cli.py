@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import fnmatch
 import os
 import re
 import signal
@@ -52,7 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _parse_patterns(raw: list[str]) -> list[re.Pattern[str]]:
-    return [re.compile(rf"\A{p}\Z") for p in raw if p]
+    return [re.compile(fnmatch.translate(p)) for p in raw if p]
 
 
 def _filter_nodes(config_nodes: dict, args: argparse.Namespace) -> list[str]:
@@ -69,12 +70,16 @@ async def config_loader(args: argparse.Namespace) -> SnipConfig:
         if "remote_build" in args:
             remote_build = args.remote_build
 
-        config = await eval_snip_config(
+        config_task = eval_snip_config(
             flake_ref=args.flake, remote_override=remote_build
         )
-        extra_node_info = await eval_node_info(flake=args.flake)
+        info_task = eval_node_info(flake=args.flake)
+
+        config, extra_node_info = await asyncio.gather(config_task, info_task)
+
         for node in extra_node_info:
-            config.nodes[node].update_nodeinfo(extra_node_info[node])
+            if node in config.nodes:
+                config.nodes[node].update_nodeinfo(extra_node_info[node])
 
         return config
 

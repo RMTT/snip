@@ -47,9 +47,7 @@ class NodeConfig:
     def from_json(
         cls, flake_ref: str, name: str, data: dict, defaults: NodeDefaults
     ) -> NodeConfig:
-        config = data.get("config", f"nixosConfigurations.{name}")
-        if not config:
-            config = f"nixosConfigurations.{name}"
+        config = data.get("config") or f"nixosConfigurations.{name}"
         config = f"{flake_ref}#{config}"
 
         return cls(

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
+import tempfile
+import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -120,8 +123,13 @@ def _save_failed_logs(progress_map: dict[str, NodeProgress]) -> None:
             continue
         if not progress.logs:
             continue
-        log_path = Path(f"/tmp/snip-{name}.log")
+        temp_dir = tempfile.gettempdir()
+        timestamp = int(time.time())
+        pid = os.getpid()
+        log_path_str = f"{temp_dir}/snip-{name}-{pid}-{timestamp}.log"
+        log_path = Path(log_path_str)
         log_path.write_text("\n".join(progress.logs) + "\n")
+        progress.log_path = log_path_str
 
 
 async def run_phase(

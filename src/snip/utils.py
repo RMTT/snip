@@ -4,17 +4,6 @@ import asyncio
 from collections.abc import Callable
 
 
-class BoundedList(list):
-    def __init__(self, maxlen: int) -> None:
-        super().__init__()
-        self._maxlen = maxlen
-
-    def append(self, item: str) -> None:
-        super().append(item)
-        if len(self) > self._maxlen:
-            del self[0]
-
-
 async def run(cmd: list[str], *, check: bool = True) -> tuple[str, str, int]:
     proc = await asyncio.create_subprocess_exec(
         *cmd,

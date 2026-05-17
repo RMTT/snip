@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from typing import Any
 
 from snip.models import SnipConfig
 from snip.utils import run as _run
@@ -40,7 +39,7 @@ in
 """
 
 
-async def eval_node_info(flake: str) -> dict[str, dict[str, Any]]:
+async def eval_node_info(flake: str) -> dict[str, dict[str, str]]:
     expr = _GET_NODE_INFO.replace("<flakePath>", flake)
     stdout, _, _ = await _run(["nix", "eval", "--impure", "--json", "--expr", expr])
     return json.loads(stdout)
