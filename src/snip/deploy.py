@@ -161,14 +161,14 @@ async def run_steps(
         node = config.nodes[name]
         progress = progress_map[name]
         async with semaphore:
-            for step in steps:
-                try:
+            try:
+                for step in steps:
                     await step.run(node, progress)
-                except Exception as e:
-                    if progress.error is None:
-                        progress.phase = DeployPhase.FAILED
-                        progress.error = e
-                    break
+                progress.phase = DeployPhase.DONE
+            except Exception as e:
+                if progress.error is None:
+                    progress.phase = DeployPhase.FAILED
+                    progress.error = e
 
     tasks = [asyncio.create_task(_run(name)) for name in node_names]
 
