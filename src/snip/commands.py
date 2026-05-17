@@ -54,28 +54,16 @@ async def list_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
 
 
 async def deploy_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
-    async def wrapper(c: SnipConfig, n: list[str], parallel: int | None = None) -> None:
-        await run_deploy(c, n, parallel=parallel)
-
-    await _handle_command(args, config, wrapper)
+    await _handle_command(args, config, run_deploy)
 
 
 async def build_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
-    async def wrapper(c: SnipConfig, n: list[str], parallel: int | None = None) -> None:
-        await run_build(c, n, parallel=parallel)
-
-    await _handle_command(args, config, wrapper)
+    await _handle_command(args, config, run_build)
 
 
 async def push_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
-    async def wrapper(c: SnipConfig, n: list[str], parallel: int | None = None) -> None:
-        await run_push(c, n, parallel=parallel)
-
-    await _handle_command(args, config, wrapper)
+    await _handle_command(args, config, run_push)
 
 
 async def activate_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
-    async def wrapper(c: SnipConfig, n: list[str], parallel: int | None = None) -> None:
-        await run_activate(c, n, parallel=parallel)
-
-    await _handle_command(args, config, wrapper)
+    await _handle_command(args, config, run_activate)
