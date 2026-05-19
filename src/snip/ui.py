@@ -6,7 +6,6 @@ import shutil
 import sys
 import textwrap
 import time
-from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum

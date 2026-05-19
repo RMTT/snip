@@ -47,7 +47,7 @@ async def realise(
     realise_cmd = _maybe_sudo(user, ["nix-store", "--realise", drv_path])
     stdout, stderr, rc = await _run_streaming(
         ssh_base + realise_cmd,
-        on_stdout=on_line,
+        on_stderr=on_line,
         check=False,
     )
     if rc != 0:
@@ -90,6 +90,7 @@ async def activate(
     stdout, stderr, rc = await _run_streaming(
         ssh_base + switch_cmd,
         on_stdout=on_line,
+        on_stderr=on_line,
         check=False,
     )
     if rc != 0:

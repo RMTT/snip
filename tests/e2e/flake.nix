@@ -59,7 +59,7 @@
           user = "snip";
           port = 2222;
           sshOptions = [
-            "IdentityFile=${toString ./keys/id_ed25519}"
+            "IdentityFile=./keys/id_ed25519"
             "StrictHostKeyChecking=no"
             "UserKnownHostsFile=/dev/null"
           ];

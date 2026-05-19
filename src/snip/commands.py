@@ -31,28 +31,28 @@ def _filter_nodes(config_nodes: dict, args: argparse.Namespace) -> list[str]:
 async def _handle_command(
     args: argparse.Namespace,
     config: SnipConfig,
-    action_fn: Callable[..., Awaitable[None]],
-) -> None:
+    action_fn: Callable[..., Awaitable[bool]],
+) -> bool:
     node_names = _filter_nodes(config.nodes, args)
 
     if not node_names:
         print(f"{AnsiUI.AMBER}No matching nodes found{AnsiUI.RESET}")
-        return
+        return True
 
     if getattr(args, "dry_run", False):
         print(
             f"{AnsiUI.BOLD}Dry run:{AnsiUI.RESET} would deploy: {', '.join(node_names)}"
         )
-        return
+        return True
 
-    await action_fn(
+    return await action_fn(
         config,
         node_names,
         args.parallel,
     )
 
 
-async def list_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
+async def list_cmd(args: argparse.Namespace, config: SnipConfig) -> bool:
     progress_map = {name: ListProgress() for name in config.nodes}
     tasks = []
 
@@ -79,22 +79,23 @@ async def list_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
         # Final render
         frame = render_dynamic_node_table(config.nodes, args.flake, progress_map)
         rewrite_display(frame_height, frame)
+        return True
     finally:
         sys.stdout.write(AnsiUI.SHOW)
         sys.stdout.flush()
 
 
-async def deploy_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
-    await _handle_command(args, config, run_deploy)
+async def deploy_cmd(args: argparse.Namespace, config: SnipConfig) -> bool:
+    return await _handle_command(args, config, run_deploy)
 
 
-async def build_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
-    await _handle_command(args, config, run_build)
+async def build_cmd(args: argparse.Namespace, config: SnipConfig) -> bool:
+    return await _handle_command(args, config, run_build)
 
 
-async def push_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
-    await _handle_command(args, config, run_push)
+async def push_cmd(args: argparse.Namespace, config: SnipConfig) -> bool:
+    return await _handle_command(args, config, run_push)
 
 
-async def activate_cmd(args: argparse.Namespace, config: SnipConfig) -> None:
-    await _handle_command(args, config, run_activate)
+async def activate_cmd(args: argparse.Namespace, config: SnipConfig) -> bool:
+    return await _handle_command(args, config, run_activate)

@@ -86,7 +86,7 @@ async def config_loader(args: argparse.Namespace) -> SnipConfig:
         sys.stdout.flush()
 
 
-async def _async_main(args: argparse.Namespace) -> None:
+async def _async_main(args: argparse.Namespace) -> int:
     loop = asyncio.get_running_loop()
     main_task = asyncio.create_task(_run(args))
 
@@ -95,17 +95,17 @@ async def _async_main(args: argparse.Namespace) -> None:
 
     loop.add_signal_handler(signal.SIGINT, _on_sigint)
     try:
-        await main_task
+        return await main_task
     except asyncio.CancelledError:
         while not main_task.done():
             await asyncio.sleep(0.5)
         print(f"\n{AnsiUI.AMBER}Cancelled.{AnsiUI.RESET}")
-        sys.exit(130)
+        return 130
     finally:
         loop.remove_signal_handler(signal.SIGINT)
 
 
-async def _run(args: argparse.Namespace) -> None:
+async def _run(args: argparse.Namespace) -> int:
     try:
         args.flake = os.path.realpath(args.flake)
         config = await config_loader(args)
@@ -115,9 +115,10 @@ async def _run(args: argparse.Namespace) -> None:
             f"Failed to parse snip config:{AnsiUI.RESET}\n\n{e}"
         )
         print(msg)
-        return
+        return 1
 
-    await args.func(args, config)
+    success = await args.func(args, config)
+    return 0 if success else 1
 
 
 def main() -> None:
@@ -128,4 +129,4 @@ def main() -> None:
         parser.print_help()
         sys.exit(1)
 
-    asyncio.run(_async_main(args))
+    sys.exit(asyncio.run(_async_main(args)))

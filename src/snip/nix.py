@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 
 from snip.models import SnipConfig
@@ -89,8 +90,22 @@ async def copy_closure(
     store_path: str,
     ssh_target: str,
     *,
+    port: int = 22,
+    ssh_options: list[str] | None = None,
     on_line: Callable[[str], None] | None = None,
 ) -> None:
+    env = os.environ.copy()
+    ssh_opts_str = ""
+    if port != 22:
+        ssh_opts_str += f"-p {port} "
+    if ssh_options:
+        for opt in ssh_options:
+            ssh_opts_str += f"-o {opt} "
+
+    if ssh_opts_str:
+        existing_ssh_opts = env.get("NIX_SSHOPTS", "")
+        env["NIX_SSHOPTS"] = f"{existing_ssh_opts} {ssh_opts_str}".strip()
+
     await _run_streaming(
         [
             "nix",
@@ -101,4 +116,5 @@ async def copy_closure(
             store_path,
         ],
         on_stderr=on_line,
+        env=env,
     )

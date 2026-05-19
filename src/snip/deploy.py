@@ -36,6 +36,8 @@ class BuildStep:
             await nix.copy_closure(
                 drv_path,
                 ssh_target,
+                port=node.port,
+                ssh_options=node.ssh_options,
                 on_line=lambda line: progress.logs.append(line),
             )
 
@@ -74,6 +76,8 @@ class PushStep:
         await nix.copy_closure(
             progress.store_path,
             f"{node.user}@{node.host}",
+            port=node.port,
+            ssh_options=node.ssh_options,
             on_line=lambda line: progress.logs.append(line),
         )
         progress.phase = DeployPhase.DONE
@@ -130,7 +134,7 @@ async def run_steps(
     steps: list[DeployStep],
     action_label: str,
     parallel: int | None = None,
-) -> None:
+) -> bool:
     progress_map: dict[str, NodeProgress] = {
         name: NodeProgress(name=name) for name in node_names
     }
@@ -146,8 +150,8 @@ async def run_steps(
                     await step.run(node, progress)
                 progress.phase = DeployPhase.DONE
             except Exception as e:
+                progress.phase = DeployPhase.FAILED
                 if progress.error is None:
-                    progress.phase = DeployPhase.FAILED
                     progress.error = e
 
     tasks = [asyncio.create_task(_run(name)) for name in node_names]
@@ -161,17 +165,22 @@ async def run_steps(
             frame_height = rewrite_display(frame_height, frame)
             await asyncio.sleep(0.1)
 
-        for t in tasks:
+        for name, t in zip(node_names, tasks):
             try:
                 await t
-            except RuntimeError:
-                pass
+            except Exception as e:
+                progress = progress_map[name]
+                progress.phase = DeployPhase.FAILED
+                if progress.error is None:
+                    progress.error = e
 
         _save_failed_logs(progress_map)
 
         nodes_list = list(progress_map.values())
         frame = render_deploy(nodes_list, action_label)
         rewrite_display(frame_height, frame)
+
+        return all(p.phase != DeployPhase.FAILED for p in progress_map.values())
     finally:
         sys.stdout.write(AnsiUI.SHOW)
         sys.stdout.flush()
@@ -181,8 +190,8 @@ async def run_build(
     config: SnipConfig,
     node_names: list[str],
     parallel: int | None = None,
-) -> None:
-    await run_steps(
+) -> bool:
+    return await run_steps(
         config,
         node_names,
         [BuildStep()],
@@ -195,8 +204,8 @@ async def run_push(
     config: SnipConfig,
     node_names: list[str],
     parallel: int | None = None,
-) -> None:
-    await run_steps(
+) -> bool:
+    return await run_steps(
         config,
         node_names,
         [BuildStep(), PushStep()],
@@ -209,8 +218,8 @@ async def run_activate(
     config: SnipConfig,
     node_names: list[str],
     parallel: int | None = None,
-) -> None:
-    await run_steps(
+) -> bool:
+    return await run_steps(
         config,
         node_names,
         [EvalStorePathStep(), ActivateStep()],
@@ -223,8 +232,8 @@ async def run_deploy(
     config: SnipConfig,
     node_names: list[str],
     parallel: int | None = None,
-) -> None:
-    await run_steps(
+) -> bool:
+    return await run_steps(
         config,
         node_names,
         [BuildStep(), PushStep(), ActivateStep()],

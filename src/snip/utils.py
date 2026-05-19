@@ -4,11 +4,14 @@ import asyncio
 from collections.abc import Callable
 
 
-async def run(cmd: list[str], *, check: bool = True) -> tuple[str, str, int]:
+async def run(
+    cmd: list[str], *, check: bool = True, env: dict[str, str] | None = None
+) -> tuple[str, str, int]:
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env=env,
     )
     try:
         stdout, stderr = await proc.communicate()
@@ -28,11 +31,13 @@ async def run_streaming(
     on_stderr: Callable[[str], None] | None = None,
     on_stdout: Callable[[str], None] | None = None,
     check: bool = True,
+    env: dict[str, str] | None = None,
 ) -> tuple[str, str, int]:
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env=env,
     )
 
     async def _read(
@@ -40,7 +45,7 @@ async def run_streaming(
         cb: Callable[[str], None] | None,
     ) -> str:
         if stream is None or cb is None:
-            return (await stream.read()).decode() if stream else ""
+            return (await stream.read()).decode(errors="replace") if stream else ""
         buf: list[str] = []
         while True:
             line = await stream.readline()
