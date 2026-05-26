@@ -25,6 +25,23 @@ async def run(
     return stdout.decode(), stderr.decode(), proc.returncode or 0
 
 
+async def _read_stream(
+    stream: asyncio.StreamReader | None,
+    cb: Callable[[str], None] | None,
+) -> str:
+    if stream is None or cb is None:
+        return (await stream.read()).decode(errors="replace") if stream else ""
+    buf: list[str] = []
+    while True:
+        line = await stream.readline()
+        if not line:
+            break
+        decoded = line.decode(errors="replace").rstrip("\n")
+        buf.append(decoded)
+        cb(decoded)
+    return "\n".join(buf)
+
+
 async def run_streaming(
     cmd: list[str],
     *,
@@ -40,26 +57,10 @@ async def run_streaming(
         env=env,
     )
 
-    async def _read(
-        stream: asyncio.StreamReader | None,
-        cb: Callable[[str], None] | None,
-    ) -> str:
-        if stream is None or cb is None:
-            return (await stream.read()).decode(errors="replace") if stream else ""
-        buf: list[str] = []
-        while True:
-            line = await stream.readline()
-            if not line:
-                break
-            decoded = line.decode(errors="replace").rstrip("\n")
-            buf.append(decoded)
-            cb(decoded)
-        return "\n".join(buf)
-
     try:
         stdout, stderr = await asyncio.gather(
-            _read(proc.stdout, on_stdout),
-            _read(proc.stderr, on_stderr),
+            _read_stream(proc.stdout, on_stdout),
+            _read_stream(proc.stderr, on_stderr),
         )
     except asyncio.CancelledError:
         proc.terminate()
