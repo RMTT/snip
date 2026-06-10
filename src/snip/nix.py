@@ -95,7 +95,7 @@ async def copy_closure(
     on_line: Callable[[str], None] | None = None,
 ) -> None:
     env = os.environ.copy()
-    ssh_opts_str = ""
+    ssh_opts_str = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
     if port != 22:
         ssh_opts_str += f"-p {port} "
     if ssh_options:
